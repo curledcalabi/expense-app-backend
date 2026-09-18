@@ -1,0 +1,58 @@
+In routes/parse-receipt.js, replace the entire callGemini function with the code below. Change nothing else in the file. Then kill the server, restart with `node server.js`, and run `node test-receipt.js`. Show me the full output including any [gemini] log lines.
+
+const MODELS = ['gemini-3.6-flash', 'gemini-3.1-flash-lite', 'gemini-2.0-flash'];
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function callGemini(imageBase64, mimeType) {
+  const key = (process.env.GEMINI_API_KEY || '').trim();
+  let lastErr;
+
+  for (const model of MODELS) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { inline_data: { mime_type: mimeType, data: imageBase64 } },
+                { text: buildPrompt() }
+              ]
+            }],
+            generationConfig: { temperature: 0, responseMimeType: 'application/json' }
+          })
+        });
+
+        if (res.status === 503 || res.status === 429) {
+          const wait = 1000 * Math.pow(2, attempt);
+          console.log(`[gemini] ${model} ${res.status}, retrying in ${wait}ms`);
+          lastErr = new Error(`${model} ${res.status}`);
+          await sleep(wait);
+          continue;
+        }
+
+        if (!res.ok) {
+          const body = await res.text();
+          lastErr = new Error(`Gemini ${res.status}: ${body.slice(0, 300)}`);
+          console.log(`[gemini] ${model} failed: ${res.status}`);
+          break;
+        }
+
+        const data = await res.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        console.log(`[gemini] answered by ${model}`);
+        return JSON.parse(text.replace(/```json|```/g, '').trim());
+      } catch (e) {
+        lastErr = e;
+        await sleep(500);
+      }
+    }
+    console.log(`[gemini] giving up on ${model}, trying next`);
+  }
+
+  throw lastErr || new Error('All Gemini models unavailable');
+}

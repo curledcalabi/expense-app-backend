@@ -1,0 +1,155 @@
+Create a Node.js Express backend with this exact file structure and exact content — do not change any logic, variable names, or route paths. After creating all files, run "npm install" then "npm start" in the shell.
+
+=== FILE: package.json ===
+{
+  "name": "expense-app-backend",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "cors": "^2.8.5", "express": "^4.19.2" }
+}
+
+=== FILE: server.js ===
+const express = require('express');
+const cors = require('cors');
+const app = express();
+app.use(cors());
+app.use(express.json({ limit: '10mb' }));
+app.use('/user', require('./routes/users'));
+app.use('/transaction', require('./routes/transactions'));
+app.use('/shops', require('./routes/shops'));
+app.use('/goals', require('./routes/goals'));
+app.use('/parse-receipt', require('./routes/parse-receipt'));
+app.get('/', (req, res) => res.send('Backend is running! Try /shops.'));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+=== FILE: db.js ===
+const fs = require('fs');
+const path = require('path');
+const DB_PATH = path.join(__dirname, 'data', 'db.json');
+function ensureDbExists() {
+  if (!fs.existsSync(DB_PATH)) {
+    fs.writeFileSync(DB_PATH, JSON.stringify({ users: [], transactions: [], goals: [] }, null, 2));
+  }
+}
+function readDb() { ensureDbExists(); return JSON.parse(fs.readFileSync(DB_PATH, 'utf-8')); }
+function writeDb(data) { fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2)); }
+module.exports = { readDb, writeDb };
+
+=== FILE: data/shops.json ===
+[
+  { "id": 1, "name": "Food Court", "category": "Food Court", "x": 55, "y": 40 },
+  { "id": 2, "name": "Baker's Bay", "category": "Bakery", "x": 60, "y": 35 },
+  { "id": 3, "name": "SJT Canteen", "category": "Canteen", "x": 45, "y": 50 },
+  { "id": 4, "name": "GDN Canteen", "category": "Canteen", "x": 30, "y": 60 },
+  { "id": 5, "name": "Nescafe Stall", "category": "Cafe", "x": 50, "y": 45 },
+  { "id": 6, "name": "Aavin Stall", "category": "Dairy/Snacks", "x": 48, "y": 42 },
+  { "id": 7, "name": "V-Mart", "category": "General Store", "x": 65, "y": 55 },
+  { "id": 8, "name": "AB1 Canteen", "category": "Canteen", "x": 40, "y": 30 },
+  { "id": 9, "name": "TT Food Court", "category": "Food Court", "x": 58, "y": 48 },
+  { "id": 10, "name": "Domino's Pizza", "category": "Fast Food", "x": 62, "y": 42 }
+]
+
+=== FILE: routes/shops.js ===
+const express = require('express');
+const fs = require('fs');
+const path = require('path');
+const router = express.Router();
+const SHOPS_PATH = path.join(__dirname, '..', 'data', 'shops.json');
+router.get('/', (req, res) => res.json(JSON.parse(fs.readFileSync(SHOPS_PATH, 'utf-8'))));
+module.exports = router;
+
+=== FILE: routes/users.js ===
+const express = require('express');
+const router = express.Router();
+const { readDb, writeDb } = require('../db');
+router.post('/', (req, res) => {
+  const { name, phone, email, avatar } = req.body;
+  if (!name || !phone || !email) return res.status(400).json({ error: 'name, phone and email are all required' });
+  const db = readDb();
+  const newUser = { id: Date.now(), name, phone, email, avatar: avatar || 'boy' };
+  db.users.push(newUser);
+  writeDb(db);
+  res.json(newUser);
+});
+router.get('/:id', (req, res) => {
+  const db = readDb();
+  const user = db.users.find(u => u.id == req.params.id);
+  if (!user) return res.status(404).json({ error: 'user not found' });
+  res.json(user);
+});
+module.exports = router;
+
+=== FILE: routes/transactions.js ===
+const express = require('express');
+const router = express.Router();
+const { readDb, writeDb } = require('../db');
+router.post('/', (req, res) => {
+  const { userId, shopId, amount, item, source } = req.body;
+  if (!userId || !amount) return res.status(400).json({ error: 'userId and amount are required' });
+  const db = readDb();
+  const newTransaction = { id: Date.now(), userId, shopId: shopId || null, amount, item: item || '', date: new Date().toISOString().slice(0, 10), source: source || 'manual' };
+  db.transactions.push(newTransaction);
+  writeDb(db);
+  res.json(newTransaction);
+});
+router.get('/', (req, res) => {
+  const { userId } = req.query;
+  const db = readDb();
+  let results = db.transactions;
+  if (userId) results = results.filter(t => t.userId == userId);
+  res.json(results);
+});
+module.exports = router;
+
+=== FILE: routes/goals.js ===
+const express = require('express');
+const router = express.Router();
+const { readDb, writeDb } = require('../db');
+router.post('/', (req, res) => {
+  const { userId, title, target, saved } = req.body;
+  if (!userId || !target) return res.status(400).json({ error: 'userId and target are required' });
+  const db = readDb();
+  let goal = db.goals.find(g => g.userId == userId);
+  if (goal) {
+    goal.title = title ?? goal.title;
+    goal.target = target ?? goal.target;
+    goal.saved = saved ?? goal.saved;
+  } else {
+    goal = { id: Date.now(), userId, title: title || 'My Goal', target, saved: saved || 0 };
+    db.goals.push(goal);
+  }
+  writeDb(db);
+  res.json(goal);
+});
+router.get('/', (req, res) => {
+  const { userId } = req.query;
+  const db = readDb();
+  res.json(db.goals.find(g => g.userId == userId) || null);
+});
+module.exports = router;
+
+=== FILE: routes/parse-receipt.js ===
+const express = require('express');
+const fs = require('fs');
+const path = require('path');
+const router = express.Router();
+const USE_REAL_AI = false;
+const SHOPS_PATH = path.join(__dirname, '..', 'data', 'shops.json');
+function matchShopId(guessedName) {
+  const shops = JSON.parse(fs.readFileSync(SHOPS_PATH, 'utf-8'));
+  const guess = (guessedName || '').toLowerCase();
+  const found = shops.find(s => guess.includes(s.name.toLowerCase()) || s.name.toLowerCase().includes(guess));
+  return found ? found.id : null;
+}
+router.post('/', async (req, res) => {
+  if (!USE_REAL_AI) {
+    const fakeResult = { shop: 'Food Court', amount: 85, item: 'Lunch' };
+    return res.json({ ...fakeResult, shopId: matchShopId(fakeResult.shop) });
+  }
+  res.status(500).json({ error: 'real AI mode not configured yet' });
+});
+module.exports = router;
+
+Do not use Replit Auth, Replit Database, or any Replit-specific integration for this — this app manages its own users and data manually in data/db.json as shown above.

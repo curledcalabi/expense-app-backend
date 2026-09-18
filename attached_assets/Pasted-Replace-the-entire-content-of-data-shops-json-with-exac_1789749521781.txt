@@ -1,0 +1,32 @@
+Replace the entire content of data/shops.json with exactly this, then restart the server:
+
+[
+  { "id": 1, "name": "GDN Canteen", "category": "Canteen", "x": 10, "y": 63 },
+  { "id": 2, "name": "All Mart (Gate 2A)", "category": "General Store", "x": 9, "y": 65 },
+  { "id": 3, "name": "CDMM", "category": "Store", "x": 16, "y": 72 },
+  { "id": 4, "name": "One Food World", "category": "Food Stall", "x": 29, "y": 44 },
+  { "id": 5, "name": "Just Bake", "category": "Bakery", "x": 43, "y": 41 },
+  { "id": 6, "name": "Aavin Tea Stall", "category": "Tea Stall", "x": 53, "y": 41 },
+  { "id": 7, "name": "Nescafe (MH)", "category": "Cafe", "x": 60, "y": 41 },
+  { "id": 8, "name": "Nescafe (Woodys)", "category": "Cafe", "x": 30, "y": 66 },
+  { "id": 9, "name": "TT Food Court", "category": "Food Court", "x": 43, "y": 65 },
+  { "id": 10, "name": "SMV Foodys", "category": "Food Stall", "x": 38, "y": 73 },
+  { "id": 11, "name": "Nescafe (SJT)", "category": "Cafe", "x": 68, "y": 52 },
+  { "id": 12, "name": "Dominos", "category": "Fast Food", "x": 68, "y": 53 },
+  { "id": 13, "name": "Lassi House", "category": "Food Stall", "x": 73, "y": 50 },
+  { "id": 14, "name": "PRP Food Court", "category": "Food Court", "x": 84, "y": 56 },
+  { "id": 15, "name": "Quick Bites (Q Block)", "category": "Food Stall", "x": 69, "y": 37 },
+  { "id": 16, "name": "Madras Cafe", "category": "Cafe", "x": 90, "y": 36 },
+  { "id": 17, "name": "All Mart (D Block)", "category": "General Store", "x": 41, "y": 38 },
+  { "id": 18, "name": "Nescafe (J Block)", "category": "Cafe", "x": 36, "y": 43 },
+  { "id": 19, "name": "Buddies and Bites (Q Block)", "category": "Food Stall", "x": 67, "y": 28 },
+  { "id": 20, "name": "Enzo (D Block)", "category": "Food Stall", "x": 41, "y": 45 },
+  { "id": 21, "name": "Style 632 (H Block)", "category": "Store", "x": 30, "y": 45 },
+  { "id": 22, "name": "Flora Canteen (F Block)", "category": "Canteen", "x": 63, "y": 56 },
+  { "id": 23, "name": "Aunty's Kitchen (C Block)", "category": "Canteen", "x": 53, "y": 56 },
+  { "id": 24, "name": "VRS Stationary (F Block)", "category": "Stationery", "x": 63, "y": 57 },
+  { "id": 25, "name": "Nescafe (E Block)", "category": "Cafe", "x": 59, "y": 55 },
+  { "id": 26, "name": "G Block General Store", "category": "General Store", "x": 45, "y": 81 },
+  { "id": 27, "name": "H Block General Store", "category": "General Store", "x": 43, "y": 86 },
+  { "id": 28, "name": "S Block General Store", "category": "General Store", "x": 81, "y": 27 }
+]
