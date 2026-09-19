@@ -9,7 +9,7 @@ const path = require("path");
 const router = express.Router();
 
 const USE_REAL_AI = true;
-const MODEL = 'gemini-3.6-flash';
+const MODEL = "gemini-3.6-flash";
 const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
 // ------------------------------------------------------------- normalizing
@@ -89,6 +89,26 @@ const shops = JSON.parse(
 );
 
 const enriched = shops.map((s) => ({ ...s, ...splitName(s.name) }));
+
+const MAP_PATH = path.join(__dirname, "..", "data", "merchant-map.json");
+
+function loadMap() {
+  try {
+    return JSON.parse(fs.readFileSync(MAP_PATH, "utf8")).mappings || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveMapping(merchantName, shopId) {
+  let file = { mappings: {} };
+  try {
+    file = JSON.parse(fs.readFileSync(MAP_PATH, "utf8"));
+  } catch {}
+  file.mappings = file.mappings || {};
+  file.mappings[normalize(merchantName)] = shopId;
+  fs.writeFileSync(MAP_PATH, JSON.stringify(file, null, 2));
+}
 
 // --------------------------------------------------------------- scoring
 function scoreAgainst(aiName, target) {
@@ -194,12 +214,16 @@ Respond with ONLY this JSON, nothing else:
 {"shopName": string, "block": string|null, "inList": boolean, "amount": number|null, "notes": string}`;
 }
 
-const MODELS = ['gemini-3.6-flash', 'gemini-3.1-flash-lite', 'gemini-2.0-flash'];
+const MODELS = [
+  "gemini-3.6-flash",
+  "gemini-3.1-flash-lite",
+  "gemini-2.0-flash",
+];
 
-const sleep = ms => new Promise(r => setTimeout(r, ms));
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function callGemini(imageBase64, mimeType) {
-  const key = (process.env.GEMINI_API_KEY || '').trim();
+  const key = (process.env.GEMINI_API_KEY || "").trim();
   let lastErr;
 
   for (const model of MODELS) {
@@ -208,17 +232,25 @@ async function callGemini(imageBase64, mimeType) {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": key,
+          },
           body: JSON.stringify({
-            contents: [{
-              parts: [
-                { inline_data: { mime_type: mimeType, data: imageBase64 } },
-                { text: buildPrompt() }
-              ]
-            }],
-            generationConfig: { temperature: 0, responseMimeType: 'application/json' }
-          })
+            contents: [
+              {
+                parts: [
+                  { inline_data: { mime_type: mimeType, data: imageBase64 } },
+                  { text: buildPrompt() },
+                ],
+              },
+            ],
+            generationConfig: {
+              temperature: 0,
+              responseMimeType: "application/json",
+            },
+          }),
         });
 
         if (res.status === 503 || res.status === 429) {
@@ -237,9 +269,9 @@ async function callGemini(imageBase64, mimeType) {
         }
 
         const data = await res.json();
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
         console.log(`[gemini] answered by ${model}`);
-        return JSON.parse(text.replace(/```json|```/g, '').trim());
+        return JSON.parse(text.replace(/```json|```/g, "").trim());
       } catch (e) {
         lastErr = e;
         await sleep(500);
@@ -248,11 +280,11 @@ async function callGemini(imageBase64, mimeType) {
     console.log(`[gemini] giving up on ${model}, trying next`);
   }
 
-  throw lastErr || new Error('All Gemini models unavailable');
+  throw lastErr || new Error("All Gemini models unavailable");
 }
 
 // ------------------------------------------------------------------ route
-router.post('/', async (req, res) => {
+router.post("/", async (req, res) => {
   try {
     const {
       imageBase64,
@@ -289,6 +321,26 @@ router.post('/', async (req, res) => {
       : imageBase64;
 
     const ai = await callGemini(clean, mimeType);
+
+    const learned = loadMap()[normalize(ai.shopName)];
+    if (learned) {
+      const s = enriched.find((x) => x.id === learned);
+      if (s) {
+        return res.json({
+          ok: true,
+          shopId: s.id,
+          shopName: s.name,
+          amount: ai.amount ?? null,
+          confidence: 1,
+          needsConfirmation: ai.amount == null,
+          ambiguous: false,
+          candidates: [],
+          source: "learned",
+          raw: ai,
+        });
+      }
+    }
+
     const block = hintBlock || ai.block || null;
     const { candidates, confidence, ambiguous } = matchShop(ai.shopName, block);
 
@@ -313,6 +365,22 @@ router.post('/', async (req, res) => {
     console.error("[parse-receipt]", err);
     res.status(500).json({ ok: false, error: err.message });
   }
+});
+
+router.post("/confirm", (req, res) => {
+  const { merchantName, shopId } = req.body || {};
+  if (!merchantName || !shopId) {
+    return res
+      .status(400)
+      .json({ ok: false, error: "merchantName and shopId required" });
+  }
+  const s = enriched.find((x) => x.id === Number(shopId));
+  if (!s) return res.status(400).json({ ok: false, error: "unknown shopId" });
+  saveMapping(merchantName, s.id);
+  res.json({
+    ok: true,
+    learned: { merchantName, shopId: s.id, shopName: s.name },
+  });
 });
 
 module.exports = router;
